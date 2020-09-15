@@ -25,7 +25,7 @@ contract ProxyArbitrage {
         // uniswapRouter = IUniswapV2Router02(UNISWAP_ROUTER_ADDRESS);
         // Pool wETH/YFI : 0x1a690056370c63AF824050d2290D3160096661eE
         // Pool YFI / MYX: 0x32741a08c02cb0f72f7e3bd4bba4aeca455b34bc
-        // Amount : 50000000000000000000 wETH
+        // Amount : 50000000000000000000 wETH (50)   -  1000000000000000000 (1)
     }
 
     /**
@@ -63,6 +63,7 @@ contract ProxyArbitrage {
         // Execute the exchange
         (uint tokenAmountOut,) = pool.swapExactAmountIn(tokens[0], tokenAmountIn, tokens[1], minAmountOut, maxPrice);
         emit BalancerArbitrageEvent(tokens[0], tokens[1], tokenAmountIn, tokenAmountOut, spotPrice, maxPrice, minAmountOut);
+        return tokenAmountOut;
     }
 
     /**
