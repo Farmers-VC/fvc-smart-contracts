@@ -10,6 +10,7 @@ contract UniswapArbitrage {
     address internal constant UNISWAP_ROUTER_ADDRESS = 0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D;
     address internal constant WETH_ADDRESS = 0xa0f764E120459bca39dB7E57a0cE975a489aB4fa;
     IUniswapV2Router02 internal uniswapRouter;
+    // MYX <> WETH Pair
     IUniswapV2Pair internal constant Pair = IUniswapV2Pair(0xd47F4f7462E895298484AB83622C78647214C2ab);
     
     constructor() public {
