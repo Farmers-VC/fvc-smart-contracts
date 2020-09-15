@@ -32,6 +32,8 @@ contract ProxyArbitrage {
         // balancerPool2 YFI / MYX: 0x32741a08c02cb0f72f7e3bd4bba4aeca455b34bc
         // uniswapPath = ["0x9657ff14c2D6d502113FDAD8166d1c14c085C2eC", "0xa0f764E120459bca39dB7E57a0cE975a489aB4fa"]  (MYX -> WETH)
         // wethAmount : 50000000000000000000 wETH (50)   -  1000000000000000000 (1)
+
+        // "0x1a690056370c63AF824050d2290D3160096661eE","0x32741a08c02cb0f72f7e3bd4bba4aeca455b34bc",["0x9657ff14c2D6d502113FDAD8166d1c14c085C2eC", "0xa0f764E120459bca39dB7E57a0cE975a489aB4fa"],"1000000000000000000"
     }
 
     /**
@@ -93,16 +95,19 @@ contract ProxyArbitrage {
         );
     }
 
-    function calcUniswapMinAmountOut(IUniswapV2Pair pairContract, uint256 amount, address tokenIn) internal view returns (uint256 minAmountOut) {
-        uint112 reserve0; 
-        uint112 reserve1; 
-        uint32 blockTimestampLast; 
+    function calcUniswapMinAmountOut(IUniswapV2Pair pairContract, uint256 amountIn, address tokenIn) internal view returns (uint256 minAmountOut) {
+        uint256 ratio;
+        uint112 reserve0;
+        uint112 reserve1;
+        uint32 blockTimestampLast;
         (reserve0, reserve1, blockTimestampLast) = pairContract.getReserves();
+
         if (pairContract.token0() == tokenIn) {
-            minAmountOut = UniswapV2Library.quote(amount, reserve0, reserve1);
-        } else{
-            minAmountOut = UniswapV2Library.quote(amount, reserve1, reserve0);
-        }   
+            ratio = reserve1 / reserve0;
+        } else {
+            ratio = reserve0 / reserve1;
+        }
+        minAmountOut = amountIn * ratio;
     }
 
     /**
