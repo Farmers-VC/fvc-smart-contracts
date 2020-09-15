@@ -1,15 +1,20 @@
 pragma solidity 0.5.12;
 
-// import "./IUniswapV2Router02.sol";
-import "./BPool.sol";
-import "./SafeMath.sol";
+import "./balancer/BPool.sol";
+import "./libraries/SafeMath.sol";
+import './uniswap/UniswapV2Library.sol';
+import "./uniswap/IUniswapV2Router02.sol";
+
 
 // Have to approve balancer Pools addresses for all token pairs involved
 // Ensure that the ProxyArbitrage has wETH to execute the transaction
 contract ProxyArbitrage {
+    address internal constant UNISWAP_FACTORY_ADDRESS = 0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f;
     address internal constant UNISWAP_ROUTER_ADDRESS = 0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D;
     address internal constant WETH_ADDRESS = 0xa0f764E120459bca39dB7E57a0cE975a489aB4fa;
     uint internal constant MAX_SLIPPAGE_PERCENTAGE = 200; // 2%
+
+    IUniswapV2Router02 internal uniswapRouter;
 
     event BalancerArbitrageEvent(
         address tokenIn,
@@ -22,19 +27,21 @@ contract ProxyArbitrage {
     );
 
     constructor() public {
-        // uniswapRouter = IUniswapV2Router02(UNISWAP_ROUTER_ADDRESS);
-        // Pool wETH/YFI : 0x1a690056370c63AF824050d2290D3160096661eE
-        // Pool YFI / MYX: 0x32741a08c02cb0f72f7e3bd4bba4aeca455b34bc
-        // Amount : 50000000000000000000 wETH (50)   -  1000000000000000000 (1)
+        uniswapRouter = IUniswapV2Router02(UNISWAP_ROUTER_ADDRESS);
+        // balancerPool1 wETH/YFI : 0x1a690056370c63AF824050d2290D3160096661eE
+        // balancerPool2 YFI / MYX: 0x32741a08c02cb0f72f7e3bd4bba4aeca455b34bc
+        // uniswapPath = ["0x9657ff14c2D6d502113FDAD8166d1c14c085C2eC", "0xa0f764E120459bca39dB7E57a0cE975a489aB4fa"]  (MYX -> WETH)
+        // wethAmount : 50000000000000000000 wETH (50)   -  1000000000000000000 (1)
     }
 
     /**
      * description: Main function to trigger arbitrage in many Uniswap/Balancer pools.
      *              This function requires ProxyArbitrage to hold wETH tokens
      */
-    function arbitrage(address balancerPool1, address balancerPool2, uint256 wethAmount) public {
+    function arbitrage(address balancerPool1, address balancerPool2, address[] memory uniswapPath, uint256 wethAmount) public {
         uint tokenAmountOut = swapBalancerPool(balancerPool1, wethAmount);
-        swapBalancerPool(balancerPool2, tokenAmountOut);
+        uint tokenAmountOut2 = swapBalancerPool(balancerPool2, tokenAmountOut);
+        swapUniswapPool(tokenAmountOut2, uniswapPath);
     }
 
 
@@ -64,6 +71,38 @@ contract ProxyArbitrage {
         (uint tokenAmountOut,) = pool.swapExactAmountIn(tokens[0], tokenAmountIn, tokens[1], minAmountOut, maxPrice);
         emit BalancerArbitrageEvent(tokens[0], tokens[1], tokenAmountIn, tokenAmountOut, spotPrice, maxPrice, minAmountOut);
         return tokenAmountOut;
+    }
+
+
+    function swapUniswapPool(uint256 amountIn, address[] memory path) public {
+        // `path` only contains 2 addresses for now
+        address pairAddress = UniswapV2Library.pairFor(UNISWAP_FACTORY_ADDRESS, path[0], path[1]);
+        IUniswapV2Pair pairContract = IUniswapV2Pair(pairAddress);
+
+        // Approve the pool from the ERC20 pairs for this smart contract
+        approveContract(path[0], UNISWAP_ROUTER_ADDRESS, amountIn);
+        approveContract(path[1], UNISWAP_ROUTER_ADDRESS, amountIn);
+
+        uint deadline = block.timestamp + 30;
+        uniswapRouter.swapExactTokensForTokensSupportingFeeOnTransferTokens(
+            amountIn,
+            calcUniswapMinAmountOut(pairContract, amountIn, path[0]),
+            path,
+            address(this),
+            deadline
+        );
+    }
+
+    function calcUniswapMinAmountOut(IUniswapV2Pair pairContract, uint256 amount, address tokenIn) internal view returns (uint256 minAmountOut) {
+        uint112 reserve0; 
+        uint112 reserve1; 
+        uint32 blockTimestampLast; 
+        (reserve0, reserve1, blockTimestampLast) = pairContract.getReserves();
+        if (pairContract.token0() == tokenIn) {
+            minAmountOut = UniswapV2Library.quote(amount, reserve0, reserve1);
+        } else{
+            minAmountOut = UniswapV2Library.quote(amount, reserve1, reserve0);
+        }   
     }
 
     /**
@@ -100,3 +139,4 @@ contract ProxyArbitrage {
     //     token.transfer(address(this), wethAmount);
     // }
 }
+
