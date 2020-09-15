@@ -10,7 +10,6 @@ contract UniswapArbitrage {
     address internal constant UNISWAP_FACTORY_ADDRESS = 0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f;
     address internal constant UNISWAP_ROUTER_ADDRESS = 0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D;
     IUniswapV2Router02 internal uniswapRouter;
-    IUniswapV2Pair internal constant Pair = IUniswapV2Pair(0xd47F4f7462E895298484AB83622C78647214C2ab);
     
     constructor() public {
         uniswapRouter = IUniswapV2Router02(UNISWAP_ROUTER_ADDRESS);
@@ -39,18 +38,16 @@ contract UniswapArbitrage {
     }
     
     function getMinAmountOut(IUniswapV2Pair PairContract, uint256 amount, address tokenIn) private view returns (uint256 minAmountOut) {
-        uint256 ratio;
         uint112 reserve0; 
         uint112 reserve1; 
         uint32 blockTimestampLast; 
         (reserve0, reserve1, blockTimestampLast) = PairContract.getReserves();
 
-        if(Pair.token0() == tokenIn){
-            ratio = reserve1/reserve0;
+        if(PairContract.token0() == tokenIn){
+            minAmountOut = UniswapV2Library.quote(amount, reserve0, reserve1)
         }else{
-            ratio = reserve0/reserve1;
-        }
-        minAmountOut = amount * ratio;
+            minAmountOut = UniswapV2Library.quote(amount, reserve1, reserve0)
+        }        
     }
     
 
