@@ -28,8 +28,10 @@ contract ProxyArbitrage {
         // balancerPool2 YFI / MYX: 0x32741a08c02cb0f72f7e3bd4bba4aeca455b34bc
         // uniswapPath = ["0x9657ff14c2D6d502113FDAD8166d1c14c085C2eC", "0xa0f764E120459bca39dB7E57a0cE975a489aB4fa"]  (MYX -> WETH)
         // wethAmount : 50000000000000000000 wETH (50)   -  1000000000000000000 (1)
-
-        // "0x1a690056370c63AF824050d2290D3160096661eE","0x32741a08c02cb0f72f7e3bd4bba4aeca455b34bc",["0x9657ff14c2D6d502113FDAD8166d1c14c085C2eC", "0xa0f764E120459bca39dB7E57a0cE975a489aB4fa"],"1000000000000000000"
+        
+        // ["0x1a690056370c63AF824050d2290D3160096661eE"],[0],"100","0"
+        // ["0x1a690056370c63AF824050d2290D3160096661eE"],[0],"50000000000000000000","0"
+        // ["0x1a690056370c63AF824050d2290D3160096661eE", "0x32741a08c02cb0f72f7e3bd4bba4aeca455b34bc", "0xd47F4f7462E895298484AB83622C78647214C2ab"],[0,"0",1],"50000000000000000000","0"
     }
 
     /**
@@ -46,7 +48,7 @@ contract ProxyArbitrage {
     // }
     function arbitrage(address[] memory path, PoolType[] memory poolType, uint256 ethAmountIn, uint256 minAmountOut) public {
         require(path.length == poolType.length, 'Path and PoolType must be equal in length');
-        require(minAmountOut > ethAmountIn, 'minAmountOut should be greater than amountIn.');
+        // require(minAmountOut > ethAmountIn, 'minAmountOut should be greater than amountIn.');
         
         uint256 tokenInAmount;
         uint256 tokenOutAmount;
@@ -68,7 +70,8 @@ contract ProxyArbitrage {
             if (poolType[i] == PoolType.BALANCER) {
                 (tokenOutAmount, tokenOutAddress) = swapBalancerPool(path[i], tokenInAmount, tokenInAddress);
             } else if (poolType[i] == PoolType.UNISWAP) {
-                
+                (tokenOutAmount, tokenOutAddress) = swapUniswapPool(path[i], tokenInAmount, tokenInAddress);
+
             } else{
                 require(false, 'Invalid pooltype');   
             }
@@ -86,7 +89,12 @@ contract ProxyArbitrage {
 
         // Retrieve the ERC20 token addresses for the `balancerPoolAddress`
         address[] memory tokens = pool.getCurrentTokens();
-
+        // Determine tokenOutAddress
+        if (tokenInAddress == tokens[0]) {
+            tokenOutAddress = tokens[1];
+        } else {
+            tokenOutAddress = tokens[0];
+        }
         // Find the current price for the pair
         uint spotPrice = pool.getSpotPrice(tokens[0], tokens[1]);
 
@@ -95,18 +103,11 @@ contract ProxyArbitrage {
         approveContract(tokens[1], balancerPoolAddress, tokenAmountIn);
 
         // Calculate MaxPrice and MinAmountOut based on `MAX_SLIPPAGE_PERCENTAGE`
-        uint256 maxPrice = SafeMath.add(spotPrice, calculatePercentage(spotPrice, MAX_SLIPPAGE_PERCENTAGE));
-        uint256 minAmountOut = SafeMath.mul(SafeMath.div(tokenAmountIn, maxPrice), 1 ether);
+        uint256 maxPrice = spotPrice*100;//SafeMath.add(spotPrice, calculatePercentage(spotPrice, MAX_SLIPPAGE_PERCENTAGE));
+        uint256 minAmountOut = 0;
 
         // Execute the exchange
-        (tokenOutAmount,) = pool.swapExactAmountIn(tokens[0], tokenAmountIn, tokens[1], minAmountOut, maxPrice);
-        
-        // Determine tokenOutAddress
-        if (tokenInAddress == tokens[0]) {
-            tokenOutAddress = tokens[1];
-        } else {
-            tokenOutAddress = tokens[0];
-        }
+        (tokenOutAmount,) = pool.swapExactAmountIn(tokenInAddress, tokenAmountIn, tokenOutAddress, minAmountOut, maxPrice);
     }
 
 
@@ -133,9 +134,10 @@ contract ProxyArbitrage {
         orderedAddresses[1] = tokenOutAddress;
         
         uint deadline = block.timestamp + 30;
-        tokenOutAmount = uniswapRouter.swapTokensForExactTokens(
+        tokenOutAmount = uniswapRouter.swapExactTokensForTokens(
             tokenAmountIn,
-            calcUniswapMinAmountOut(pairContract, tokenAmountIn, tokenInAddress),
+            0,
+            //calcUniswapMinAmountOut(pairContract, tokenAmountIn, tokenInAddress),
             orderedAddresses,
             address(this),
             deadline
@@ -184,15 +186,5 @@ contract ProxyArbitrage {
             token.approve(poolAddress, 99999999999 ether);
         }
     }
-
-
-    /**
-     * description: function to transfer wETH to the ProxyArbitrage contract
-     * param uint256 wethAmount: Amount in Wei of WETH to transfer to the ProxyArbitrage contract
-     */
-    // function transferWETHToProxy(uint256 wethAmount) internal {
-    //     IERC20 token = IERC20(WETH_ADDRESS);
-    //     token.transfer(address(this), wethAmount);
-    // }
 }
 
