@@ -9,27 +9,21 @@ import "./uniswap/IUniswapV2Router02.sol";
 // Have to approve balancer Pools addresses for all token pairs involved
 // Ensure that the ProxyArbitrage has wETH to execute the transaction
 contract ProxyArbitrage {
+    enum PoolType { BALANCER, UNISWAP }
+
+    // Uniswap Factory and Router addresses should be the same on mainnet and testnets
     address internal constant UNISWAP_FACTORY_ADDRESS = 0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f;
     address internal constant UNISWAP_ROUTER_ADDRESS = 0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D;
     
-    // TODO!!! Change to real wETH ADDRESS
+    // TODO!!! Change to real wETH ADDRESS for production
     address internal constant WETH_ADDRESS = 0xa0f764E120459bca39dB7E57a0cE975a489aB4fa;
     uint internal constant MAX_SLIPPAGE_PERCENTAGE = 200; // 2%
 
-    IUniswapV2Router02 internal uniswapRouter;
-
-    event BalancerArbitrageEvent(
-        address tokenIn,
-        address tokenOut,
-        uint256 tokenAmountIn,
-        uint tokenAmountOut,
-        uint spotPrice,
-        uint256 maxPrice,
-        uint256 minAmountOut
-    );
+    IUniswapV2Router02 internal uniswapRouter = IUniswapV2Router02(UNISWAP_ROUTER_ADDRESS);
+    
+    // TODO: Withdraw function w/ onlyowner
 
     constructor() public {
-        uniswapRouter = IUniswapV2Router02(UNISWAP_ROUTER_ADDRESS);
         // balancerPool1 wETH/YFI : 0x1a690056370c63AF824050d2290D3160096661eE
         // balancerPool2 YFI / MYX: 0x32741a08c02cb0f72f7e3bd4bba4aeca455b34bc
         // uniswapPath = ["0x9657ff14c2D6d502113FDAD8166d1c14c085C2eC", "0xa0f764E120459bca39dB7E57a0cE975a489aB4fa"]  (MYX -> WETH)
@@ -42,22 +36,52 @@ contract ProxyArbitrage {
      * description: Main function to trigger arbitrage in many Uniswap/Balancer pools.
      *              This function requires ProxyArbitrage to hold wETH tokens
      */
-    function arbitrage(address balancerPool1, address balancerPool2, address[] memory uniswapPath, uint256 wethAmount) public {
-        uint tokenAmountOut = swapBalancerPool(balancerPool1, wethAmount);
-        uint tokenAmountOut2 = swapBalancerPool(balancerPool2, tokenAmountOut);
-        swapUniswapPool(tokenAmountOut2, uniswapPath);
+    // function arbitrage(address balancerPool1, address balancerPool2, address[] memory uniswapPath, uint256 wethAmount) public {
+    //     uint tokenAmountOut = swapBalancerPool(balancerPool1, wethAmount);
+    //     uint tokenAmountOut2 = swapBalancerPool(balancerPool2, tokenAmountOut);
+    //     swapUniswapPool(tokenAmountOut2, uniswapPath);
 
-        // TODO!!! Require minEthAmount
-        // TODO!!! Require final token == wETH
+    //     // TODO!!! Require minEthAmount
+    //     // TODO!!! Require final token == wETH
+    // }
+    function arbitrage(address[] memory path, PoolType[] memory poolType, uint256 ethAmountIn, uint256 minAmountOut) public {
+        require(path.length == poolType.length, 'Path and PoolType must be equal in length');
+        require(minAmountOut > ethAmountIn, 'minAmountOut should be greater than amountIn.');
+        
+        uint256 tokenInAmount;
+        uint256 tokenOutAmount;
+        address tokenOutAddress;
+        address tokenInAddress;
+                
+
+        for (uint8 i = 0; i < path.length; i++) { 
+            // On first iteration, the token traded is always wETH
+            if (i == 0) {
+                tokenInAddress = WETH_ADDRESS;
+                tokenInAmount = ethAmountIn;
+            } else {
+                tokenInAddress = tokenOutAddress;
+                tokenInAmount = tokenOutAmount;
+            }
+            
+            
+            if (poolType[i] == PoolType.BALANCER) {
+                (tokenOutAmount, tokenOutAddress) = swapBalancerPool(path[i], tokenInAmount, tokenInAddress);
+            } else if (poolType[i] == PoolType.UNISWAP) {
+                
+            } else{
+                require(false, 'Invalid pooltype');   
+            }
+        }
+        
     }
-
 
     /**
      * description: Internal function that trigger trades in Balancer Pools
      * param address balancerPoolAddress: Balancer's pool address
      * param uint256 tokenAmountIn: Amount of token to trade in
      */
-    function swapBalancerPool(address balancerPoolAddress, uint256 tokenAmountIn) internal returns (uint) {
+    function swapBalancerPool(address balancerPoolAddress, uint256 tokenAmountIn, address tokenInAddress) internal returns (uint256 tokenOutAmount, address tokenOutAddress) {
         BPool pool = BPool(balancerPoolAddress);
 
         // Retrieve the ERC20 token addresses for the `balancerPoolAddress`
@@ -75,33 +99,50 @@ contract ProxyArbitrage {
         uint256 minAmountOut = SafeMath.mul(SafeMath.div(tokenAmountIn, maxPrice), 1 ether);
 
         // Execute the exchange
-        (uint tokenAmountOut,) = pool.swapExactAmountIn(tokens[0], tokenAmountIn, tokens[1], minAmountOut, maxPrice);
-        emit BalancerArbitrageEvent(tokens[0], tokens[1], tokenAmountIn, tokenAmountOut, spotPrice, maxPrice, minAmountOut);
-        return tokenAmountOut;
+        (tokenOutAmount,) = pool.swapExactAmountIn(tokens[0], tokenAmountIn, tokens[1], minAmountOut, maxPrice);
+        
+        // Determine tokenOutAddress
+        if (tokenInAddress == tokens[0]) {
+            tokenOutAddress = tokens[1];
+        } else {
+            tokenOutAddress = tokens[0];
+        }
     }
 
 
-    function swapUniswapPool(uint256 amountIn, address[] memory path) public {
+    function swapUniswapPool(address pairAddress, uint256 tokenAmountIn, address tokenInAddress) internal returns (uint256 tokenOutAmount, address tokenOutAddress)  {
         // `path` only contains 2 addresses for now
-        address pairAddress = UniswapV2Library.pairFor(UNISWAP_FACTORY_ADDRESS, path[0], path[1]);
+        // address pairAddress = UniswapV2Library.pairFor(UNISWAP_FACTORY_ADDRESS, path[0], path[1]);
         IUniswapV2Pair pairContract = IUniswapV2Pair(pairAddress);
+        address token0 = pairContract.token0();
+        address token1 = pairContract.token1();
+        
+        // Determine tokenOutAddress
+        if (token0 == tokenInAddress) {
+            tokenOutAddress = token1;
+        } else {
+            tokenOutAddress = token0;
+        }
 
         // Approve the pool from the ERC20 pairs for this smart contract
-        approveContract(path[0], UNISWAP_ROUTER_ADDRESS, amountIn);
-        approveContract(path[1], UNISWAP_ROUTER_ADDRESS, amountIn);
+        approveContract(tokenInAddress, UNISWAP_ROUTER_ADDRESS, tokenAmountIn);
+        approveContract(tokenOutAddress, UNISWAP_ROUTER_ADDRESS, tokenAmountIn);
 
+        address[] memory orderedAddresses = new address[](2);
+        orderedAddresses[0] = tokenInAddress;
+        orderedAddresses[1] = tokenOutAddress;
+        
         uint deadline = block.timestamp + 30;
-        uniswapRouter.swapTokensForExactTokens(
-            amountIn,
-            calcUniswapMinAmountOut(pairContract, amountIn, path[0]),
-            path,
+        tokenOutAmount = uniswapRouter.swapTokensForExactTokens(
+            tokenAmountIn,
+            calcUniswapMinAmountOut(pairContract, tokenAmountIn, tokenInAddress),
+            orderedAddresses,
             address(this),
             deadline
-        );
+        )[0];
     }
 
     function calcUniswapMinAmountOut(IUniswapV2Pair pairContract, uint256 amountIn, address tokenIn) internal view returns (uint256 minAmountOut) {
-        uint256 ratio;
         uint112 reserve0;
         uint112 reserve1;
         uint32 blockTimestampLast;
