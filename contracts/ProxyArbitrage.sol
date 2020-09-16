@@ -86,7 +86,7 @@ contract ProxyArbitrage {
         approveContract(path[1], UNISWAP_ROUTER_ADDRESS, amountIn);
 
         uint deadline = block.timestamp + 30;
-        uniswapRouter.swapExactTokensForTokensSupportingFeeOnTransferTokens(
+        uniswapRouter.swapTokensForExactTokens(
             amountIn,
             calcUniswapMinAmountOut(pairContract, amountIn, path[0]),
             path,
@@ -103,11 +103,16 @@ contract ProxyArbitrage {
         (reserve0, reserve1, blockTimestampLast) = pairContract.getReserves();
 
         if (pairContract.token0() == tokenIn) {
-            ratio = reserve1 / reserve0;
+            minAmountOut = uniswapQuote(amountIn, reserve0, reserve1);
         } else {
-            ratio = reserve0 / reserve1;
+            minAmountOut = uniswapQuote(amountIn, reserve1, reserve0);
         }
-        minAmountOut = amountIn * ratio;
+    }
+
+    function uniswapQuote(uint amountA, uint reserveA, uint reserveB) internal pure returns (uint amountB) {
+        require(amountA > 0, 'UniswapV2Library: INSUFFICIENT_AMOUNT');
+        require(reserveA > 0 && reserveB > 0, 'UniswapV2Library: INSUFFICIENT_LIQUIDITY');
+        amountB = SafeMath.div(SafeMath.mul(amountA, reserveB), reserveA);
     }
 
     /**
