@@ -1,6 +1,6 @@
-pragma solidity >=0.5.0;
+pragma solidity 0.5.12;
 
-import "./SafeMath.sol";
+import "../libraries/SafeMath.sol";
 
 
 interface IUniswapV2Pair {
