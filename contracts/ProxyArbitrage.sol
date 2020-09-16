@@ -11,6 +11,8 @@ import "./uniswap/IUniswapV2Router02.sol";
 contract ProxyArbitrage {
     address internal constant UNISWAP_FACTORY_ADDRESS = 0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f;
     address internal constant UNISWAP_ROUTER_ADDRESS = 0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D;
+    
+    // TODO!!! Change to real wETH ADDRESS
     address internal constant WETH_ADDRESS = 0xa0f764E120459bca39dB7E57a0cE975a489aB4fa;
     uint internal constant MAX_SLIPPAGE_PERCENTAGE = 200; // 2%
 
@@ -44,6 +46,9 @@ contract ProxyArbitrage {
         uint tokenAmountOut = swapBalancerPool(balancerPool1, wethAmount);
         uint tokenAmountOut2 = swapBalancerPool(balancerPool2, tokenAmountOut);
         swapUniswapPool(tokenAmountOut2, uniswapPath);
+
+        // TODO!!! Require minEthAmount
+        // TODO!!! Require final token == wETH
     }
 
 
