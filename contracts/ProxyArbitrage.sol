@@ -60,7 +60,7 @@ contract ProxyArbitrage {
      */
     function arbitrage(address[] memory path, PoolType[] memory poolType, uint256 ethAmountIn, uint256 minAmountOut) public {
         require(path.length == poolType.length, 'Path and PoolType must be equal in length');
-        // require(minAmountOut > ethAmountIn, 'minAmountOut should be greater than amountIn.');
+        require(minAmountOut > ethAmountIn, 'minAmountOut should be greater than amountIn.');
         
         uint256 tokenInAmount;
         uint256 tokenOutAmount;
