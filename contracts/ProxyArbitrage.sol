@@ -53,7 +53,7 @@ contract ProxyArbitrage {
         IERC20 token = IERC20(tokenAddress);
         token.transfer(address(_owner), token.balanceOf(address(this)));
     }
-    
+
     /**
      * description: Main function to trigger arbitrage in many Uniswap/Balancer pools.
      *              This function requires ProxyArbitrage to hold wETH tokens
@@ -101,12 +101,9 @@ contract ProxyArbitrage {
 
         // Retrieve the ERC20 token addresses for the `balancerPoolAddress`
         address[] memory tokens = pool.getCurrentTokens();
-        // Determine tokenOutAddress
-        if (tokenInAddress == tokens[0]) {
-            tokenOutAddress = tokens[1];
-        } else {
-            tokenOutAddress = tokens[0];
-        }
+
+        tokenOutAddress = getTokenOut(tokenInAddress, tokens[0], tokens[1]);
+
         // Find the current price for the pair
         uint256 spotPrice = pool.getSpotPrice(tokens[0], tokens[1]);
 
@@ -128,12 +125,7 @@ contract ProxyArbitrage {
         address token0 = pairContract.token0();
         address token1 = pairContract.token1();
         
-        // Determine tokenOutAddress
-        if (token0 == tokenInAddress) {
-            tokenOutAddress = token1;
-        } else {
-            tokenOutAddress = token0;
-        }
+        tokenOutAddress = getTokenOut(tokenInAddress, token0, token1);
 
         // Approve the pool from the ERC20 pairs for this smart contract
         approveContract(tokenInAddress, UNISWAP_ROUTER_ADDRESS, tokenAmountIn);
@@ -152,6 +144,14 @@ contract ProxyArbitrage {
             address(this),
             deadline
         )[0];
+    }
+
+    function getTokenOut(address tokenInAddress, address token0, address token1) internal pure returns (address tokenOutAddress) {
+        if (token0 == tokenInAddress) {
+            tokenOutAddress = token1;
+        } else {
+            tokenOutAddress = token0;
+        }     
     }
 
      /**
