@@ -12,10 +12,7 @@ import "./uniswap/IUniswapV2Router02.sol";
 // uniswapPath = ["0x9657ff14c2D6d502113FDAD8166d1c14c085C2eC", "0xa0f764E120459bca39dB7E57a0cE975a489aB4fa"]  (MYX -> WETH)
 // wethAmount : 50000000000000000000 wETH (50)   -  1000000000000000000 (1)
 
-// ["0x1a690056370c63AF824050d2290D3160096661eE"],[0],"50000000000000000000","0"
-// ["0xd47F4f7462E895298484AB83622C78647214C2ab"],[1],"50000000000000000000","0"
 // ["0x1a690056370c63AF824050d2290D3160096661eE", "0x32741a08c02cb0f72f7e3bd4bba4aeca455b34bc", "0xd47F4f7462E895298484AB83622C78647214C2ab"],[0,"0",1],"50000000000000000000","0"
-
 
 // Have to approve balancer Pools addresses for all token pairs involved
 // Ensure that the ProxyArbitrage has wETH to execute the transaction
@@ -33,7 +30,6 @@ contract ProxyArbitrage {
 
     IUniswapV2Router02 internal uniswapRouter = IUniswapV2Router02(UNISWAP_ROUTER_ADDRESS);
     
-
     constructor() public {
         _owner = msg.sender;
     }
@@ -77,13 +73,12 @@ contract ProxyArbitrage {
                 tokenInAmount = tokenOutAmount;
             }
             
-            
             if (poolType[i] == PoolType.BALANCER) {
                 (tokenOutAmount, tokenOutAddress) = swapBalancerPool(path[i], tokenInAmount, tokenInAddress);
             } else if (poolType[i] == PoolType.UNISWAP) {
                 (tokenOutAmount, tokenOutAddress) = swapUniswapPool(path[i], tokenInAmount, tokenInAddress);
             } else{
-                require(false, 'Invalid pooltype');   
+                revert('Invalid pooltype');   
             }
         }
 
@@ -102,7 +97,7 @@ contract ProxyArbitrage {
         // Retrieve the ERC20 token addresses for the `balancerPoolAddress`
         address[] memory tokens = pool.getCurrentTokens();
 
-        tokenOutAddress = getTokenOut(tokenInAddress, tokens[0], tokens[1]);
+        tokenOutAddress = getTokenOutAddress(tokenInAddress, tokens[0], tokens[1]);
 
         // Find the current price for the pair
         uint256 spotPrice = pool.getSpotPrice(tokens[0], tokens[1]);
@@ -125,7 +120,7 @@ contract ProxyArbitrage {
         address token0 = pairContract.token0();
         address token1 = pairContract.token1();
         
-        tokenOutAddress = getTokenOut(tokenInAddress, token0, token1);
+        tokenOutAddress = getTokenOutAddress(tokenInAddress, token0, token1);
 
         // Approve the pool from the ERC20 pairs for this smart contract
         approveContract(tokenInAddress, UNISWAP_ROUTER_ADDRESS, tokenAmountIn);
@@ -146,7 +141,7 @@ contract ProxyArbitrage {
         )[0];
     }
 
-    function getTokenOut(address tokenInAddress, address token0, address token1) internal pure returns (address tokenOutAddress) {
+    function getTokenOutAddress(address tokenInAddress, address token0, address token1) internal pure returns (address tokenOutAddress) {
         if (token0 == tokenInAddress) {
             tokenOutAddress = token1;
         } else {
