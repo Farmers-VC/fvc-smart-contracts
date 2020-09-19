@@ -24,8 +24,7 @@ contract ProxyArbitrage {
     address internal constant UNISWAP_FACTORY_ADDRESS = 0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f;
     address internal constant UNISWAP_ROUTER_ADDRESS = 0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D;
     
-    // TODO!!! Change to real wETH ADDRESS for production
-    address internal constant WETH_ADDRESS = 0xa0f764E120459bca39dB7E57a0cE975a489aB4fa;
+    address internal constant WETH_ADDRESS = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
     // uint internal constant MAX_SLIPPAGE_PERCENTAGE = 200; // 2%
 
     IUniswapV2Router02 internal uniswapRouter = IUniswapV2Router02(UNISWAP_ROUTER_ADDRESS);
