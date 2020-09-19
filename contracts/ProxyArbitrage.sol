@@ -18,7 +18,7 @@ import "./uniswap/IUniswapV2Router02.sol";
 // Ensure that the ProxyArbitrage has wETH to execute the transaction
 contract ProxyArbitrage {
     address payable private _owner;
-    enum PoolType { BALANCER, UNISWAP }
+    enum PoolType { BALANCER, UNISWAP, SUSHISWAP }
 
     // Uniswap Factory and Router addresses should be the same on mainnet and testnets
     address internal constant UNISWAP_FACTORY_ADDRESS = 0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f;
@@ -75,6 +75,8 @@ contract ProxyArbitrage {
             if (poolType[i] == PoolType.BALANCER) {
                 (tokenOutAmount, tokenOutAddress) = swapBalancerPool(path[i], tokenInAmount, tokenInAddress);
             } else if (poolType[i] == PoolType.UNISWAP) {
+                (tokenOutAmount, tokenOutAddress) = swapUniswapPool(path[i], tokenInAmount, tokenInAddress);
+            } else if (poolType[i] == PoolType.SUSHISWAP) {
                 (tokenOutAmount, tokenOutAddress) = swapUniswapPool(path[i], tokenInAmount, tokenInAddress);
             } else{
                 revert('Invalid pooltype');   
