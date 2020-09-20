@@ -23,6 +23,7 @@ contract ProxyArbitrage {
     // Uniswap Factory and Router addresses should be the same on mainnet and testnets
     address internal constant UNISWAP_FACTORY_ADDRESS = 0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f;
     address internal constant UNISWAP_ROUTER_ADDRESS = 0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D;
+    address internal constant SUSHISWAP_ROUTER_ADDRESS = 0xd9e1cE17f2641f24aE83637ab66a2cca9C378B9F;
     
     address internal constant WETH_ADDRESS = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
     // uint internal constant MAX_SLIPPAGE_PERCENTAGE = 200; // 2%
@@ -77,7 +78,7 @@ contract ProxyArbitrage {
             } else if (poolType[i] == PoolType.UNISWAP) {
                 (tokenOutAmount, tokenOutAddress) = swapUniswapPool(path[i], tokenInAmount, tokenInAddress);
             } else if (poolType[i] == PoolType.SUSHISWAP) {
-                (tokenOutAmount, tokenOutAddress) = swapUniswapPool(path[i], tokenInAmount, tokenInAddress);
+                (tokenOutAmount, tokenOutAddress) = swapSushiswapPool(path[i], tokenInAmount, tokenInAddress);
             } else{
                 revert('Invalid pooltype');   
             }
@@ -115,7 +116,6 @@ contract ProxyArbitrage {
         (tokenOutAmount,) = pool.swapExactAmountIn(tokenInAddress, tokenAmountIn, tokenOutAddress, minAmountOut, maxPrice);
     }
 
-
     function swapUniswapPool(address pairAddress, uint256 tokenAmountIn, address tokenInAddress) internal returns (uint256 tokenOutAmount, address tokenOutAddress)  {
         IUniswapV2Pair pairContract = IUniswapV2Pair(pairAddress);
         address token0 = pairContract.token0();
@@ -133,15 +133,42 @@ contract ProxyArbitrage {
         
         uint256 deadline = block.timestamp + 30; // 2 block deadline
         uint256 minAmountOut = 0; //calcUniswapMinAmountOut(pairContract, tokenAmountIn, tokenInAddress),
-        tokenOutAmount = uniswapRouter.swapExactTokensForTokens(
+        uint[] memory returnAmounts = uniswapRouter.swapExactTokensForTokens(
             tokenAmountIn,
             minAmountOut,
             orderedAddresses,
             address(this),
             deadline
-        )[0];
+        );
+        tokenOutAmount = returnAmounts[returnAmounts.length - 1];
     }
 
+    function swapSushiswapPool(address pairAddress, uint256 tokenAmountIn, address tokenInAddress) internal returns (uint256 tokenOutAmount, address tokenOutAddress)  {
+        IUniswapV2Pair pairContract = IUniswapV2Pair(pairAddress);
+        address token0 = pairContract.token0();
+        address token1 = pairContract.token1();
+        
+        tokenOutAddress = getTokenOutAddress(tokenInAddress, token0, token1);
+
+        // Approve the pool from the ERC20 pairs for this smart contract
+        approveContract(tokenInAddress, SUSHISWAP_ROUTER_ADDRESS, tokenAmountIn);
+        approveContract(tokenOutAddress, SUSHISWAP_ROUTER_ADDRESS, tokenAmountIn);
+
+        address[] memory orderedAddresses = new address[](2);
+        orderedAddresses[0] = tokenInAddress;
+        orderedAddresses[1] = tokenOutAddress;
+        
+        uint256 deadline = block.timestamp + 30; // 2 block deadline
+        uint256 minAmountOut = 0; //calcUniswapMinAmountOut(pairContract, tokenAmountIn, tokenInAddress),
+        uint[] memory returnAmounts = uniswapRouter.swapExactTokensForTokens(
+            tokenAmountIn,
+            minAmountOut,
+            orderedAddresses,
+            address(this),
+            deadline
+        );
+        tokenOutAmount = returnAmounts[returnAmounts.length - 1];
+    }
     function getTokenOutAddress(address tokenInAddress, address token0, address token1) internal pure returns (address tokenOutAddress) {
         if (token0 == tokenInAddress) {
             tokenOutAddress = token1;
