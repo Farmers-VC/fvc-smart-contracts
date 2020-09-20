@@ -6,16 +6,6 @@ import './uniswap/UniswapV2Library.sol';
 import "./uniswap/IUniswapV2Router02.sol";
 
 
-// TEST DATA:
-// balancerPool1 wETH/YFI : 0x1a690056370c63AF824050d2290D3160096661eE
-// balancerPool2 YFI / MYX: 0x32741a08c02cb0f72f7e3bd4bba4aeca455b34bc
-// uniswapPath = ["0x9657ff14c2D6d502113FDAD8166d1c14c085C2eC", "0xa0f764E120459bca39dB7E57a0cE975a489aB4fa"]  (MYX -> WETH)
-// wethAmount : 50000000000000000000 wETH (50)   -  1000000000000000000 (1)
-
-// ["0x1a690056370c63AF824050d2290D3160096661eE", "0x32741a08c02cb0f72f7e3bd4bba4aeca455b34bc", "0xd47F4f7462E895298484AB83622C78647214C2ab"],[0,"0",1],"50000000000000000000","0"
-
-// Have to approve balancer Pools addresses for all token pairs involved
-// Ensure that the ProxyArbitrage has wETH to execute the transaction
 contract ProxyArbitrage {
     address payable private _owner;
     enum PoolType { BALANCER, UNISWAP, SUSHISWAP }
@@ -23,10 +13,10 @@ contract ProxyArbitrage {
     // Uniswap Factory and Router addresses should be the same on mainnet and testnets
     address internal constant UNISWAP_FACTORY_ADDRESS = 0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f;
     address internal constant UNISWAP_ROUTER_ADDRESS = 0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D;
-    address internal constant SUSHISWAP_ROUTER_ADDRESS = 0xd9e1cE17f2641f24aE83637ab66a2cca9C378B9F;
     
+    address internal constant SUSHISWAP_ROUTER_ADDRESS = 0xd9e1cE17f2641f24aE83637ab66a2cca9C378B9F;
+
     address internal constant WETH_ADDRESS = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
-    // uint internal constant MAX_SLIPPAGE_PERCENTAGE = 200; // 2%
 
     IUniswapV2Router02 internal uniswapRouter = IUniswapV2Router02(UNISWAP_ROUTER_ADDRESS);
     
@@ -76,9 +66,9 @@ contract ProxyArbitrage {
             if (poolType[i] == PoolType.BALANCER) {
                 (tokenOutAmount, tokenOutAddress) = swapBalancerPool(path[i], tokenInAmount, tokenInAddress);
             } else if (poolType[i] == PoolType.UNISWAP) {
-                (tokenOutAmount, tokenOutAddress) = swapUniswapPool(path[i], tokenInAmount, tokenInAddress);
+                (tokenOutAmount, tokenOutAddress) = swapUniswapPool(path[i], tokenInAmount, tokenInAddress, UNISWAP_ROUTER_ADDRESS);
             } else if (poolType[i] == PoolType.SUSHISWAP) {
-                (tokenOutAmount, tokenOutAddress) = swapSushiswapPool(path[i], tokenInAmount, tokenInAddress);
+                (tokenOutAmount, tokenOutAddress) = swapUniswapPool(path[i], tokenInAmount, tokenInAddress, SUSHISWAP_ROUTER_ADDRESS);
             } else{
                 revert('Invalid pooltype');   
             }
@@ -116,7 +106,7 @@ contract ProxyArbitrage {
         (tokenOutAmount,) = pool.swapExactAmountIn(tokenInAddress, tokenAmountIn, tokenOutAddress, minAmountOut, maxPrice);
     }
 
-    function swapUniswapPool(address pairAddress, uint256 tokenAmountIn, address tokenInAddress) internal returns (uint256 tokenOutAmount, address tokenOutAddress)  {
+    function swapUniswapPool(address pairAddress, uint256 tokenAmountIn, address tokenInAddress, address routerAddress) internal returns (uint256 tokenOutAmount, address tokenOutAddress)  {
         IUniswapV2Pair pairContract = IUniswapV2Pair(pairAddress);
         address token0 = pairContract.token0();
         address token1 = pairContract.token1();
@@ -124,8 +114,8 @@ contract ProxyArbitrage {
         tokenOutAddress = getTokenOutAddress(tokenInAddress, token0, token1);
 
         // Approve the pool from the ERC20 pairs for this smart contract
-        approveContract(tokenInAddress, UNISWAP_ROUTER_ADDRESS, tokenAmountIn);
-        approveContract(tokenOutAddress, UNISWAP_ROUTER_ADDRESS, tokenAmountIn);
+        approveContract(tokenInAddress, routerAddress, tokenAmountIn);
+        approveContract(tokenOutAddress, routerAddress, tokenAmountIn);
 
         address[] memory orderedAddresses = new address[](2);
         orderedAddresses[0] = tokenInAddress;
@@ -143,32 +133,6 @@ contract ProxyArbitrage {
         tokenOutAmount = returnAmounts[returnAmounts.length - 1];
     }
 
-    function swapSushiswapPool(address pairAddress, uint256 tokenAmountIn, address tokenInAddress) internal returns (uint256 tokenOutAmount, address tokenOutAddress)  {
-        IUniswapV2Pair pairContract = IUniswapV2Pair(pairAddress);
-        address token0 = pairContract.token0();
-        address token1 = pairContract.token1();
-        
-        tokenOutAddress = getTokenOutAddress(tokenInAddress, token0, token1);
-
-        // Approve the pool from the ERC20 pairs for this smart contract
-        approveContract(tokenInAddress, SUSHISWAP_ROUTER_ADDRESS, tokenAmountIn);
-        approveContract(tokenOutAddress, SUSHISWAP_ROUTER_ADDRESS, tokenAmountIn);
-
-        address[] memory orderedAddresses = new address[](2);
-        orderedAddresses[0] = tokenInAddress;
-        orderedAddresses[1] = tokenOutAddress;
-        
-        uint256 deadline = block.timestamp + 30; // 2 block deadline
-        uint256 minAmountOut = 0; //calcUniswapMinAmountOut(pairContract, tokenAmountIn, tokenInAddress),
-        uint[] memory returnAmounts = uniswapRouter.swapExactTokensForTokens(
-            tokenAmountIn,
-            minAmountOut,
-            orderedAddresses,
-            address(this),
-            deadline
-        );
-        tokenOutAmount = returnAmounts[returnAmounts.length - 1];
-    }
     function getTokenOutAddress(address tokenInAddress, address token0, address token1) internal pure returns (address tokenOutAddress) {
         if (token0 == tokenInAddress) {
             tokenOutAddress = token1;
@@ -183,42 +147,13 @@ contract ProxyArbitrage {
      * param uint256 pool: Balancer or Uniswap pool
      * param uint amount: amount to transfer (ensure that the alloance is at least >= amount)
      */
-    function approveContract(address tokenAddress, address poolAddress, uint amount) internal {
+    function approveContract(address tokenAddress, address spender, uint amount) internal {
         IERC20 token = IERC20(tokenAddress);
 
-        if (token.allowance(address(this), poolAddress) < amount) {
-            token.approve(poolAddress, 99999999999 ether);
+        if (token.allowance(address(this), spender) < amount) {
+            token.approve(spender, 99999999999 ether);
         }
     }   
-
-    // function calcUniswapMinAmountOut(IUniswapV2Pair pairContract, uint256 amountIn, address tokenIn) internal view returns (uint256 minAmountOut) {
-    //     uint112 reserve0;
-    //     uint112 reserve1;
-    //     uint32 blockTimestampLast;
-    //     (reserve0, reserve1, blockTimestampLast) = pairContract.getReserves();
-
-    //     if (pairContract.token0() == tokenIn) {
-    //         minAmountOut = uniswapQuote(amountIn, reserve0, reserve1);
-    //     } else {
-    //         minAmountOut = uniswapQuote(amountIn, reserve1, reserve0);
-    //     }
-    // }
-
-    // function uniswapQuote(uint amountA, uint reserveA, uint reserveB) internal pure returns (uint amountB) {
-    //     require(amountA > 0, 'UniswapV2Library: INSUFFICIENT_AMOUNT');
-    //     require(reserveA > 0 && reserveB > 0, 'UniswapV2Library: INSUFFICIENT_LIQUIDITY');
-    //     amountB = SafeMath.div(SafeMath.mul(amountA, reserveB), reserveA);
-    // }
-    
-    // /**
-    //  * description: Calculate percentage
-    //  * param uint amount: Amount
-    //  * param uint percentage: percentage
-    //  * return uint256: Amount * percentage/100
-    //  */
-    // function calculatePercentage(uint amount, uint percentage) pure internal returns (uint256)  {
-    //     return SafeMath.div(SafeMath.mul(amount, percentage), 10000);
-    // }
 
 }
 
