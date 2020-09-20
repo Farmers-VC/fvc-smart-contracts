@@ -10,16 +10,13 @@ contract ProxyArbitrage {
     address payable private _owner;
     enum PoolType { BALANCER, UNISWAP, SUSHISWAP }
 
-    // Uniswap Factory and Router addresses should be the same on mainnet and testnets
-    address internal constant UNISWAP_FACTORY_ADDRESS = 0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f;
+    // Uniswap Router addresses should be the same on mainnet and testnets
     address internal constant UNISWAP_ROUTER_ADDRESS = 0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D;
     
     address internal constant SUSHISWAP_ROUTER_ADDRESS = 0xd9e1cE17f2641f24aE83637ab66a2cca9C378B9F;
 
     address internal constant WETH_ADDRESS = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
 
-    IUniswapV2Router02 internal uniswapRouter = IUniswapV2Router02(UNISWAP_ROUTER_ADDRESS);
-    
     constructor() public {
         _owner = msg.sender;
     }
@@ -123,14 +120,18 @@ contract ProxyArbitrage {
         
         uint256 deadline = block.timestamp + 30; // 2 block deadline
         uint256 minAmountOut = 0; //calcUniswapMinAmountOut(pairContract, tokenAmountIn, tokenInAddress),
-        uint[] memory returnAmounts = uniswapRouter.swapExactTokensForTokens(
+        
+        IUniswapV2Router02 router = IUniswapV2Router02(routerAddress);
+        router.swapExactTokensForTokens(
             tokenAmountIn,
             minAmountOut,
             orderedAddresses,
             address(this),
             deadline
         );
-        tokenOutAmount = returnAmounts[returnAmounts.length - 1];
+
+        IERC20 token = IERC20(tokenOutAddress);
+        tokenOutAmount = token.balanceOf(address(this));
     }
 
     function getTokenOutAddress(address tokenInAddress, address token0, address token1) internal pure returns (address tokenOutAddress) {
