@@ -45,6 +45,9 @@ contract ProxyArbitrage {
         require(path.length == poolType.length, 'Path and PoolType must be equal in length');
         require(minAmountOut > ethAmountIn, 'minAmountOut should be greater than amountIn.');
         
+        IERC20 wethToken = IERC20(WETH_ADDRESS);
+        uint256 startingEthBalance = wethToken.balanceOf(address(this));
+
         uint256 tokenInAmount;
         uint256 tokenOutAmount;
         address tokenOutAddress;
@@ -71,8 +74,11 @@ contract ProxyArbitrage {
             }
         }
 
+
         require(tokenOutAddress == WETH_ADDRESS, 'Final token needs to be WETH');
-        require(tokenOutAmount >= minAmountOut, 'tokenOutAmount must be greater than minAmountOut');   
+
+        uint256 finalEthBalance = wethToken.balanceOf(address(this));
+        require(finalEthBalance >= startingEthBalance, 'This transaction loses WETH');   
     }
 
     /**
