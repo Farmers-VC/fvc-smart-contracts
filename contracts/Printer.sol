@@ -6,13 +6,13 @@ import './uniswap/UniswapV2Library.sol';
 import "./uniswap/IUniswapV2Router02.sol";
 
 
-contract ProxyArbitrage {
+contract Printer {
     address payable private _owner;
     enum PoolType { BALANCER, UNISWAP, SUSHISWAP }
 
     // Uniswap Router addresses should be the same on mainnet and testnets
     address internal constant UNISWAP_ROUTER_ADDRESS = 0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D;
-    
+
     address internal constant SUSHISWAP_ROUTER_ADDRESS = 0xd9e1cE17f2641f24aE83637ab66a2cca9C378B9F;
 
     address internal constant WETH_ADDRESS = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
@@ -25,12 +25,12 @@ contract ProxyArbitrage {
         require(_owner == msg.sender, "Ownable: caller is not the owner");
         _;
     }
-  
+
     // Ability to withdraw eth
     function withdrawEth() public onlyOwner {
         address(_owner).transfer(address(this).balance);
     }
-   
+
     // Ability to withdraw any token
     function withdrawToken(address tokenAddress) public onlyOwner {
         IERC20 token = IERC20(tokenAddress);
@@ -39,12 +39,13 @@ contract ProxyArbitrage {
 
     /**
      * description: Main function to trigger arbitrage in many Uniswap/Balancer pools.
-     *              This function requires ProxyArbitrage to hold wETH tokens
+     *              This function requires Printer to hold wETH tokens
      */
-    function arbitrage(address[] memory path, PoolType[] memory poolType, uint256 ethAmountIn, uint256 minAmountOut) public onlyOwner {
+    function arbitrage(address[] memory path, PoolType[] memory poolType, uint256 ethAmountIn, uint256 estimateGasCost) public onlyOwner {
+        require(path.length >= 2 && path.length <= 4, 'Path length has to be between 2 and 4');
         require(path.length == poolType.length, 'Path and PoolType must be equal in length');
-        require(minAmountOut > ethAmountIn, 'minAmountOut should be greater than amountIn.');
-        
+        require(estimateGasCost > 0 && estimateGasCost < 1 ether, 'estimateGasCost should be greater than zero and lower than 1 ether');
+
         IERC20 wethToken = IERC20(WETH_ADDRESS);
         uint256 startingEthBalance = wethToken.balanceOf(address(this));
 
@@ -52,8 +53,8 @@ contract ProxyArbitrage {
         uint256 tokenOutAmount;
         address tokenOutAddress;
         address tokenInAddress;
-                
-        for (uint8 i = 0; i < path.length; i++) { 
+
+        for (uint8 i = 0; i < path.length; i++) {
             if (i == 0) {
                 // On first iteration, the token traded is always wETH
                 tokenInAddress = WETH_ADDRESS;
@@ -62,7 +63,7 @@ contract ProxyArbitrage {
                 tokenInAddress = tokenOutAddress;
                 tokenInAmount = tokenOutAmount;
             }
-            
+
             if (poolType[i] == PoolType.BALANCER) {
                 (tokenOutAmount, tokenOutAddress) = swapBalancerPool(path[i], tokenInAmount, tokenInAddress);
             } else if (poolType[i] == PoolType.UNISWAP) {
@@ -70,7 +71,7 @@ contract ProxyArbitrage {
             } else if (poolType[i] == PoolType.SUSHISWAP) {
                 (tokenOutAmount, tokenOutAddress) = swapUniswapPool(path[i], tokenInAmount, tokenInAddress, SUSHISWAP_ROUTER_ADDRESS);
             } else{
-                revert('Invalid pooltype');   
+                revert('Invalid pooltype');
             }
         }
 
@@ -78,7 +79,7 @@ contract ProxyArbitrage {
         require(tokenOutAddress == WETH_ADDRESS, 'Final token needs to be WETH');
 
         uint256 finalEthBalance = wethToken.balanceOf(address(this));
-        require(finalEthBalance >= startingEthBalance, 'This transaction loses WETH');   
+        require(finalEthBalance >= (startingEthBalance + estimateGasCost), 'This transaction loses WETH');
     }
 
     /**
@@ -97,7 +98,7 @@ contract ProxyArbitrage {
         // Find the current price for the pair
         uint256 spotPrice = pool.getSpotPrice(tokens[0], tokens[1]);
 
-        // Approve the pool from the ERC20 pairs for the ProxyArbitrage smart contract
+        // Approve the pool from the ERC20 pairs for the Printer smart contract
         approveContract(tokens[0], balancerPoolAddress, tokenAmountIn);
         approveContract(tokens[1], balancerPoolAddress, tokenAmountIn);
 
@@ -113,7 +114,7 @@ contract ProxyArbitrage {
         IUniswapV2Pair pairContract = IUniswapV2Pair(pairAddress);
         address token0 = pairContract.token0();
         address token1 = pairContract.token1();
-        
+
         tokenOutAddress = getTokenOutAddress(tokenInAddress, token0, token1);
 
         // Approve the pool from the ERC20 pairs for this smart contract
@@ -123,10 +124,10 @@ contract ProxyArbitrage {
         address[] memory orderedAddresses = new address[](2);
         orderedAddresses[0] = tokenInAddress;
         orderedAddresses[1] = tokenOutAddress;
-        
+
         uint256 deadline = block.timestamp + 30; // 2 block deadline
         uint256 minAmountOut = 0; //calcUniswapMinAmountOut(pairContract, tokenAmountIn, tokenInAddress),
-        
+
         IUniswapV2Router02 router = IUniswapV2Router02(routerAddress);
         router.swapExactTokensForTokens(
             tokenAmountIn,
@@ -145,11 +146,11 @@ contract ProxyArbitrage {
             tokenOutAddress = token1;
         } else {
             tokenOutAddress = token0;
-        }     
+        }
     }
 
      /**
-     * description: Approve the pool to move ERC20 tokens on behalf of the ProxyArbitrage contract
+     * description: Approve the pool to move ERC20 tokens on behalf of the Printer contract
      * param address tokenAddress: ERC20 token address
      * param uint256 pool: Balancer or Uniswap pool
      * param uint amount: amount to transfer (ensure that the alloance is at least >= amount)
@@ -158,9 +159,10 @@ contract ProxyArbitrage {
         IERC20 token = IERC20(tokenAddress);
 
         if (token.allowance(address(this), spender) < amount) {
-            token.approve(spender, 99999999999 ether);
+            token.approve(spender, 999999 ether);
         }
-    }   
+    }
 
 }
+
 
