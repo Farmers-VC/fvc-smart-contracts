@@ -15,7 +15,7 @@ contract Printer {
 
     address internal constant SUSHISWAP_ROUTER_ADDRESS = 0xd9e1cE17f2641f24aE83637ab66a2cca9C378B9F;
 
-    address internal constant WETH_ADDRESS = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
+    address public constant WETH_ADDRESS = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
 
     constructor() public {
         _owner = msg.sender;
@@ -42,7 +42,7 @@ contract Printer {
      *              This function requires Printer to hold wETH tokens
      */
     function arbitrage(address[] memory path, PoolType[] memory poolType, uint256 ethAmountIn, uint256 estimateGasCost) public onlyOwner {
-        require(path.length >= 2 && path.length <= 4, 'Path length has to be between 2 and 4');
+        require(path.length >= 2 && path.length <= 5, 'Path length has to be between 2 and 4');
         require(path.length == poolType.length, 'Path and PoolType must be equal in length');
         require(estimateGasCost > 0 && estimateGasCost < 1 ether, 'estimateGasCost should be greater than zero and lower than 1 ether');
 
