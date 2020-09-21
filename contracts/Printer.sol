@@ -129,7 +129,7 @@ contract Printer {
         uint256 minAmountOut = 0; //calcUniswapMinAmountOut(pairContract, tokenAmountIn, tokenInAddress),
 
         IUniswapV2Router02 router = IUniswapV2Router02(routerAddress);
-        router.swapExactTokensForTokens(
+        router.swapExactTokensForTokensSupportingFeeOnTransferTokens(
             tokenAmountIn,
             minAmountOut,
             orderedAddresses,
