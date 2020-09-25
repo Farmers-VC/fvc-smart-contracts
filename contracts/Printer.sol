@@ -46,7 +46,7 @@ contract Printer {
         uint256 maxBlockNumber
         ) external onlyOwner {
         require(_active, 'Contract is inactive');
-        require(block.number < maxBlockNumber, 'Tx > maxBlockNumber');
+        require(block.number < maxBlockNumber, 'maxBlockNumber');
 
         uint256 startEthAmount = wethToken.balanceOf(address(this));
         uint256 currentAmount = ethAmountIn;
