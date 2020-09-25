@@ -9,6 +9,8 @@ import "./libraries/SafeMath.sol";
 contract Printer {
     address payable private _owner;
     address internal constant WETH_ADDRESS = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
+    address internal constant UNISWAP_ROUTER = 0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D;
+    address internal constant SUSHISWAP_ROUTER = 0xd9e1cE17f2641f24aE83637ab66a2cca9C378B9F;
     IERC20 wethToken = IERC20(WETH_ADDRESS);
     enum PoolType { BALANCER, UNISWAP, SUSHISWAP }
     bool public _active;
@@ -52,15 +54,15 @@ contract Printer {
 
         for(uint i; i < path.length; i++){
             if (poolType[i] == PoolType.UNISWAP) {
-                (currentAmount, currentAddress) = swapUniswapPool(path[i], currentAmount, minAmountOuts[i], currentAddress, address(0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D));
+                (currentAmount, currentAddress) = swapUniswapPool(path[i], currentAmount, minAmountOuts[i], currentAddress, UNISWAP_ROUTER);
             } else if (poolType[i] == PoolType.BALANCER) {
                 (currentAmount, currentAddress) = swapBalancerPool(path[i], currentAmount, minAmountOuts[i], currentAddress);
             } else if (poolType[i] == PoolType.SUSHISWAP) {
-                (currentAmount, currentAddress) = swapUniswapPool(path[i], currentAmount, minAmountOuts[i], currentAddress, address(0xd9e1cE17f2641f24aE83637ab66a2cca9C378B9F));
+                (currentAmount, currentAddress) = swapUniswapPool(path[i], currentAmount, minAmountOuts[i], currentAddress, SUSHISWAP_ROUTER);
             }
         }
 
-        require(currentAddress == WETH_ADDRESS, 'Final token needs to be WETH');
+        require(currentAddress == WETH_ADDRESS, 'Last token not WETH');
         require(wethToken.balanceOf(address(this)) >= (startEthAmount + estimateGasCost), 'Tx loses WETH');
     }
 
