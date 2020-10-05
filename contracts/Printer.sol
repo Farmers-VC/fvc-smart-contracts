@@ -18,6 +18,7 @@ contract PrinterV2 {
         ) external onlyOwner {
         require(_active, 'Contract is inactive');
         require(block.number < maxBlockNumber, 'maxBlockNumber');
+
         uint256 startEthAmount = wethToken.balanceOf(address(this));
         uint256 currentAmount = ethAmountIn;
         for(uint i; i < tokenPaths.length; i++){
@@ -29,6 +30,7 @@ contract PrinterV2 {
                 currentAmount = swapUniswapPool(currentAmount, minAmountOuts[i], tokenPaths[i], SUSHISWAP_ROUTER);
             }
         }
+
         require(wethToken.balanceOf(address(this)) >= SafeMath.add(startEthAmount, estimateGasCost), 'Tx loses WETH');
     }
     
@@ -36,7 +38,7 @@ contract PrinterV2 {
     address payable private _owner;
     address internal constant WETH_ADDRESS = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
     address internal constant UNISWAP_ROUTER = 0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D;
-	address internal constant SUSHISWAP_ROUTER = 0xd9e1cE17f2641f24aE83637ab66a2cca9C378B9F;
+    address internal constant SUSHISWAP_ROUTER = 0xd9e1cE17f2641f24aE83637ab66a2cca9C378B9F;
     IERC20 wethToken = IERC20(WETH_ADDRESS);
     bool public _active;
 
