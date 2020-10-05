@@ -7,7 +7,7 @@ import "./SafeMath.sol";
 
 contract PrinterV2 {
     using SafeMath for uint256;
-    
+
     function arbitrage(
         address[7][3] calldata tokenPaths,
         uint256[3] calldata minAmountOuts,
@@ -32,13 +32,13 @@ contract PrinterV2 {
         }
         require(wethToken.balanceOf(address(this)) >= startEthAmount.add(estimateGasCost), 'Tx loses WETH');
     }
-    
+
     function unmask(address maskedAddress) internal pure returns (address unmaskedAddress) {
         unmaskedAddress = address(uint(maskedAddress) ^ uint(0x49a55f1e8EC5025deb60a38724004E21E8dC4eBe));
     }
 
-    function swapBalancerPool(uint256 tokenAmountIn, uint256 minAmountOut, address poolAddress, address tokenInAddress, address tokenOutAddress) 
-    internal returns (uint256 tokenOutAmount) 
+    function swapBalancerPool(uint256 tokenAmountIn, uint256 minAmountOut, address poolAddress, address tokenInAddress, address tokenOutAddress)
+    internal returns (uint256 tokenOutAmount)
     {
         approveContract(unmask(tokenInAddress), unmask(poolAddress), tokenAmountIn);
         (tokenOutAmount,) = BPool(unmask(poolAddress)).swapExactAmountIn(
@@ -49,8 +49,8 @@ contract PrinterV2 {
             999999999999000000000000000000);
     }
 
-    function swapUniswapPool(uint256 tokenAmountIn, uint256 minAmountOut, address[7] memory tokenPaths) 
-    internal returns (uint256 tokenOutAmount)  
+    function swapUniswapPool(uint256 tokenAmountIn, uint256 minAmountOut, address[7] memory tokenPaths)
+    internal returns (uint256 tokenOutAmount)
     {
         // We store the number of tokens in `tokenPaths` in the last element of the array
         address[] memory orderedAddresses = new address[](uint(tokenPaths[tokenPaths.length - 1]));
@@ -74,7 +74,7 @@ contract PrinterV2 {
             IERC20(tokenAddress).approve(spender, 999999 ether);
         }
     }
-    
+
     address payable private _owner;
     address internal constant WETH_ADDRESS = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
     mapping (address => bool) private executors;
@@ -90,12 +90,12 @@ contract PrinterV2 {
         require(_owner == msg.sender, "caller is not the owner");
         _;
     }
-    
+
     modifier onlyExecutor() {
         require(executors[msg.sender], "not executors");
         _;
     }
-    
+
     function setExecutor(address executor, bool active) external onlyOwner {
         executors[executor] = active;
     }
