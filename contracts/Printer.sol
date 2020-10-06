@@ -107,4 +107,7 @@ contract PrinterV2 {
     function toggleActive() external onlyOwner {
         _active = !_active;
     }
+
+    function fake() external {
+    }
 }
