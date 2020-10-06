@@ -104,6 +104,10 @@ contract PrinterV2 {
         address(_owner).transfer(address(this).balance);
     }
 
+    function withdrawToken(address tokenAddress, uint256 amount) external onlyOwner {
+        IERC20(tokenAddress).transfer(address(_owner), amount);
+    }
+
     function toggleActive() external onlyOwner {
         _active = !_active;
     }
